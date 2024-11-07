@@ -20,6 +20,6 @@
         public const string Code = "";//填入你的主播身份码Code，可以在互动玩法首页，右下角【身份码】处获取(互玩首页：https://play-live.bilibili.com/)
 ```
 
-然后运行即可得到示例结果
+然后运行`OpenBLiveSample`项目即可得到示例结果
 - 例如
 ![运行截图](https://github.com/user-attachments/assets/b3b8fc57-1627-45ee-b3e4-6aedf20ff51e)
