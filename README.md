@@ -23,3 +23,5 @@
 然后运行`OpenBLiveSample`项目即可得到示例结果
 - 例如
 ![运行截图](https://github.com/user-attachments/assets/b3b8fc57-1627-45ee-b3e4-6aedf20ff51e)
+
+图例中的消息字段说明见[长链消息cmd文档](https://open-live.bilibili.com/document/f9ce25be-312e-1f4a-85fd-fef21f1637f8)
