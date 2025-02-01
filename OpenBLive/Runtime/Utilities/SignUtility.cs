@@ -1,31 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-#if NET5_0_OR_GREATER
-using System.Net;
-#elif UNITY_2020_3_OR_NEWER
-using UnityEngine.Networking;
-#endif
 
 namespace OpenBLive.Runtime.Utilities
 {
     public static class SignUtility
     {
-        #region AccessKey
-
         /// <summary>
         /// 开放平台的access_key_secret，请妥善保管以防泄露
         /// </summary>
-        public static string accessKeySecret = "";
+        private static string accessKeySecret = "";
 
         /// <summary>
         /// 开放平台的access_key_id，请妥善保管以防泄露
         /// </summary>
-        public static string accessKeyId = "";
-        #endregion
+        private static string accessKeyId = "";
+
+        public static void SetAccessKey(string accessKeyId, string accessKeySecret)
+        {
+            SignUtility.accessKeyId = accessKeyId;
+            SignUtility.accessKeySecret = accessKeySecret;
+        }
 
         private static Dictionary<string, string> OrderAndMd5(string jsonParam)
         {
@@ -96,8 +91,8 @@ namespace OpenBLive.Runtime.Utilities
 
             return builder.ToString();
         }
-#if NET5_0_OR_GREATER
-        public static void SetReqHeader(HttpWebRequest req, string jsonParam, string cookie = null)
+
+        public static void SetReqHeader(HttpRequestMessage req, string jsonParam, string cookie = null)
         {
             var sortDic = OrderAndMd5(jsonParam);
             var auth = CalculateSignature(sortDic);
@@ -107,8 +102,7 @@ namespace OpenBLive.Runtime.Utilities
             }
 
             req.Headers.Add("Authorization", auth);
-            req.Accept = "application/json";
-            req.ContentType = "application/json";
+            req.Headers.Add("Accept", "application/json");
 
 
             if (cookie != null)
@@ -116,36 +110,8 @@ namespace OpenBLive.Runtime.Utilities
                 req.Headers.Add("Cookie", cookie);
             }
 
-            var bytes = Encoding.UTF8.GetBytes(jsonParam);
-            req.ContentLength = bytes.Length;
-            using Stream writer = req.GetRequestStream();
-            writer.Write(bytes, 0, bytes.Length);
-            writer.Close();
+            req.Content = new StringContent(jsonParam, Encoding.UTF8);
+            req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         }
-
-
-
-#elif UNITY_2020_3_OR_NEWER
-        public static void SetReqHeader(UnityWebRequest webRequest, string jsonParam, string cookie = null)
-        {
-            var sortDic = OrderAndMd5(jsonParam);
-            var auth = CalculateSignature(sortDic);
-            foreach (var item in sortDic)
-            {
-                webRequest.SetRequestHeader(item.Key, item.Value);
-            }
-
-            webRequest.SetRequestHeader("Authorization", auth);
-            webRequest.SetRequestHeader("Accept", "application/json");
-            webRequest.SetRequestHeader("Content-Type", "application/json");
-            if (cookie != null)
-            {
-                webRequest.SetRequestHeader("Cookie", cookie);
-            }
-
-            var bytes = Encoding.UTF8.GetBytes(jsonParam);
-            webRequest.uploadHandler = new UploadHandlerRaw(bytes);
-        }
-#endif
     }
 }

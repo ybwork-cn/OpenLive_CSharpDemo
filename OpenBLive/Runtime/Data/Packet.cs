@@ -1,15 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-#if UNITY_2021_2_OR_NEWER || NET5_0_OR_GREATER
-using System.Buffers;
-#else
-using System.Net;
-#endif
-
+﻿using System.Text;
 
 namespace OpenBLive.Runtime.Data
 {
@@ -28,25 +17,17 @@ namespace OpenBLive.Runtime.Data
 
         public PacketHeader Header;
 
-        public int Length => Header.PacketLength;
+        public readonly int Length => Header.PacketLength;
 
         public byte[] PacketBody;
-#if UNITY_2021_2_OR_NEWER || NET5_0_OR_GREATER
+
         public Packet(ReadOnlySpan<byte> bytes)
         {
             var headerBuffer = bytes[0..PacketHeader.KPacketHeaderLength];
             Header = new PacketHeader(headerBuffer);
             PacketBody = bytes[Header.HeaderLength..Header.PacketLength].ToArray();
         }
-#else
-        public Packet(byte[] bytes)
-        {
-            var headerBuffer = new ArraySegment<byte>(bytes, 0, PacketHeader.KPacketHeaderLength);
-            Header = new PacketHeader(headerBuffer);
-            var body = new ArraySegment<byte>(bytes, Header.HeaderLength, Header.BodyLength).ToArray();
-            PacketBody = body;
-        }
-#endif
+
         public Packet(Operation operation, byte[] body = null)
         {
             Header = new PacketHeader
@@ -67,11 +48,7 @@ namespace OpenBLive.Runtime.Data
                 else
                     Header.PacketLength = Header.HeaderLength;
                 var arr = new byte[Header.PacketLength];
-#if UNITY_2021_2_OR_NEWER || NET5_0_OR_GREATER
-                Array.Copy(((ReadOnlySpan<byte>) Header).ToArray(), arr, Header.HeaderLength);
-#else
-                Array.Copy((byte[]) Header, arr, Header.HeaderLength);
-#endif
+                Array.Copy(((ReadOnlySpan<byte>)Header).ToArray(), arr, Header.HeaderLength);
                 if (PacketBody != null)
                     Array.Copy(PacketBody, 0, arr, Header.HeaderLength, PacketBody.Length);
                 return arr;

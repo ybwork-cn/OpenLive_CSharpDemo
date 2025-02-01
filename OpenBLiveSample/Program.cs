@@ -4,8 +4,6 @@ using OpenBLive.Client.Data;
 using OpenBLive.Runtime;
 using OpenBLive.Runtime.Data;
 using OpenBLive.Runtime.Utilities;
-using System.ComponentModel;
-using System.Diagnostics.Metrics;
 using System.Text;
 
 namespace OpenBLiveSample
@@ -13,29 +11,23 @@ namespace OpenBLiveSample
     internal class Program
     {
         //初始化于测试的参数
-        public const string AccessKeyId = "";//填入你的accessKeyId，可以在直播创作者服务中心【个人资料】页面获取(https://open-live.bilibili.com/open-manage)
-        public const string AccessKeySecret = "";//填入你的accessKeySecret，可以在直播创作者服务中心【个人资料】页面获取(https://open-live.bilibili.com/open-manage)
-        public const string AppId = "";//填入你的appId，可以在直播创作者服务中心【我的项目】页面创建应用后获取(https://open-live.bilibili.com/open-manage)
-        public const string Code = "";//填入你的主播身份码Code，可以在互动玩法首页，右下角【身份码】处获取(互玩首页：https://play-live.bilibili.com/)
+        public const string AccessKeyId = "Sdv1wrqU2Am3DI4xI1CwzWXo";//填入你的accessKeyId，可以在直播创作者服务中心【个人资料】页面获取(https://open-live.bilibili.com/open-manage)
+        public const string AccessKeySecret = "8Y96R1a5waycBQl0GgWhOESWcOJhLM";//填入你的accessKeySecret，可以在直播创作者服务中心【个人资料】页面获取(https://open-live.bilibili.com/open-manage)
+        public const string AppId = "1689295902472";//填入你的appId，可以在直播创作者服务中心【我的项目】页面创建应用后获取(https://open-live.bilibili.com/open-manage)
+        public const string Code = "BSGFCJBOZMDC4";//填入你的主播身份码Code，可以在互动玩法首页，右下角【身份码】处获取(互玩首页：https://play-live.bilibili.com/)
 
- 
         public static IBApiClient bApiClient = new BApiClient();
         public static string game_id = string.Empty;
         public static bool IsLive = false;
-        
 
-        public static async Task Main(string[] args)
+        public static async Task Main()
         {
             //是否为测试环境（一般用户可无视，给专业对接测试使用）
             BApi.isTestEnv = false;
 
-            SignUtility.accessKeyId = AccessKeyId;
-            SignUtility.accessKeySecret = AccessKeySecret;
+            SignUtility.SetAccessKey(AccessKeyId, AccessKeySecret);
             var appId = AppId;
             var code = Code;
-
-            
-            var startInfo = new AppStartInfo();
 
             Console.WriteLine("请输入自动关闭时间,不输入默认30秒");
             var closeTimeStr = Console.ReadLine();
@@ -46,92 +38,80 @@ namespace OpenBLiveSample
 
             if (!string.IsNullOrEmpty(appId))
             {
-                startInfo = await bApiClient.StartInteractivePlay(code, appId);
-                if (startInfo?.Code != 0)
+                AppStartInfo startInfo = await bApiClient.StartInteractivePlay(code, appId);
+                if (startInfo.Code != 0)
                 {
-                    Console.WriteLine(startInfo?.Message);
+                    Console.WriteLine(startInfo.Message);
                     return;
                 }
 
-                var gameId = startInfo?.Data?.GameInfo?.GameId;
-                if (gameId != null)
-                {
-                    game_id=gameId;
-                    IsLive = true;
-                    Console.WriteLine("成功开启，开始心跳，场次ID: " + gameId);
+                string gameId = startInfo.Data.GameInfo.GameId;
 
-                    //心跳API（用于保持在线）
-                    InteractivePlayHeartBeat m_PlayHeartBeat = new InteractivePlayHeartBeat(gameId);
-                    m_PlayHeartBeat.HeartBeatError += M_PlayHeartBeat_HeartBeatError;
-                    m_PlayHeartBeat.HeartBeatSucceed += M_PlayHeartBeat_HeartBeatSucceed;
-                    m_PlayHeartBeat.Start();
+                game_id = gameId;
+                IsLive = true;
+                Console.WriteLine("成功开启，开始心跳，场次ID: " + gameId);
 
-                    //长链接（用户持续接收服务器推送消息）
-                    WebSocketBLiveClient m_WebSocketBLiveClient;
-                    m_WebSocketBLiveClient = new WebSocketBLiveClient(startInfo.GetWssLink(), startInfo.GetAuthBody());
-                    m_WebSocketBLiveClient.OnDanmaku += WebSocketBLiveClientOnDanmaku;//弹幕事件
-                    m_WebSocketBLiveClient.OnGift += WebSocketBLiveClientOnGift;//礼物事件
-                    m_WebSocketBLiveClient.OnGuardBuy += WebSocketBLiveClientOnGuardBuy;//大航海事件
-                    m_WebSocketBLiveClient.OnSuperChat += WebSocketBLiveClientOnSuperChat;//SC事件
-                    m_WebSocketBLiveClient.OnLike += M_WebSocketBLiveClient_OnLike;//点赞事件(点赞需要直播间开播才会触发推送)
-                    m_WebSocketBLiveClient.OnEnter += M_WebSocketBLiveClient_OnEnter;//观众进入房间事件
-                    m_WebSocketBLiveClient.OnLiveStart += M_WebSocketBLiveClient_OnLiveStart;//直播间开始直播事件
-                    m_WebSocketBLiveClient.OnLiveEnd += M_WebSocketBLiveClient_OnLiveEnd;//直播间停止直播事件
-                    //m_WebSocketBLiveClient.Connect();//正常连接
-                    m_WebSocketBLiveClient.Connect(TimeSpan.FromSeconds(30));//失败后30秒重连
-                }
-                else
-                {
-                    Console.WriteLine("开启玩法错误: " + startInfo.ToString());
-                }
+                //心跳API（用于保持在线）
+                InteractivePlayHeartBeat m_PlayHeartBeat = new InteractivePlayHeartBeat(gameId);
+                m_PlayHeartBeat.HeartBeatError += PlayHeartBeat_HeartBeatError;
+                m_PlayHeartBeat.HeartBeatSucceed += PlayHeartBeat_HeartBeatSucceed;
+                m_PlayHeartBeat.Start();
+
+                //长链接（用户持续接收服务器推送消息）
+                using WebSocketBLiveClient m_WebSocketBLiveClient = new WebSocketBLiveClient(startInfo.GetWssLink(), startInfo.GetAuthBody());
+                m_WebSocketBLiveClient.OnDanmaku += WebSocketBLiveClientOnDanmaku;//弹幕事件
+                m_WebSocketBLiveClient.OnGift += WebSocketBLiveClientOnGift;//礼物事件
+                m_WebSocketBLiveClient.OnGuardBuy += WebSocketBLiveClientOnGuardBuy;//大航海事件
+                m_WebSocketBLiveClient.OnSuperChat += WebSocketBLiveClientOnSuperChat;//SC事件
+                m_WebSocketBLiveClient.OnLike += WebSocketBLiveClient_OnLike;//点赞事件(点赞需要直播间开播才会触发推送)
+                m_WebSocketBLiveClient.OnEnter += WebSocketBLiveClient_OnEnter;//观众进入房间事件
+                m_WebSocketBLiveClient.OnLiveStart += WebSocketBLiveClient_OnLiveStart;//直播间开始直播事件
+                m_WebSocketBLiveClient.OnLiveEnd += WebSocketBLiveClient_OnLiveEnd;//直播间停止直播事件
+                //m_WebSocketBLiveClient.Connect();//正常连接
+                m_WebSocketBLiveClient.Connect(TimeSpan.FromSeconds(30));//失败后30秒重连
+
                 await Task.Run(async () =>
                 {
                     var closeTime = int.Parse(closeTimeStr);
                     await Task.Delay(closeTime * 1000);
                     var ret = await bApiClient.EndInteractivePlay(appId, gameId);
                     IsLive = false;
-                    Console.WriteLine("关闭玩法: " + ret.ToString());
+                    Console.WriteLine("关闭玩法: " + JsonConvert.SerializeObject(ret));
                     return;
                 });
             }
-
-            
-            while (true)
-            {
-                Console.ReadKey(true);
-            }
         }
 
-        private static void M_WebSocketBLiveClient_OnLiveEnd(LiveEnd liveEnd)
+        private static void WebSocketBLiveClient_OnLiveEnd(LiveEnd liveEnd)
         {
             StringBuilder sb = new StringBuilder($"直播间[{liveEnd.room_id}]直播结束，分区ID：【{liveEnd.area_id}】,标题为【{liveEnd.title}】");
             Logger.Log(sb.ToString());
         }
 
-        private static void M_WebSocketBLiveClient_OnLiveStart(LiveStart liveStart)
+        private static void WebSocketBLiveClient_OnLiveStart(LiveStart liveStart)
         {
             StringBuilder sb = new StringBuilder($"直播间[{liveStart.room_id}]开始直播，分区ID：【{liveStart.area_id}】,标题为【{liveStart.title}】");
             Logger.Log(sb.ToString());
         }
 
-        private static void M_WebSocketBLiveClient_OnEnter(Enter enter)
+        private static void WebSocketBLiveClient_OnEnter(Enter enter)
         {
             StringBuilder sb = new StringBuilder($"用户[{enter.uname}]进入房间");
             Logger.Log(sb.ToString());
         }
 
-        private static void M_WebSocketBLiveClient_OnLike(Like like)
+        private static void WebSocketBLiveClient_OnLike(Like like)
         {
             StringBuilder sb = new StringBuilder($"用户[{like.uname}]点赞了{like.unamelike_count}次");
             Logger.Log(sb.ToString());
         }
 
-        private static void M_PlayHeartBeat_HeartBeatSucceed()
+        private static void PlayHeartBeat_HeartBeatSucceed()
         {
-            Logger.Log("心跳成功");
+            //Logger.Log("心跳成功");
         }
 
-        private static void M_PlayHeartBeat_HeartBeatError(string json)
+        private static void PlayHeartBeat_HeartBeatError(string json)
         {
             JsonConvert.DeserializeObject<EmptyInfo>(json);
             Logger.Log("心跳失败" + json);
@@ -145,7 +125,7 @@ namespace OpenBLiveSample
 
         private static void WebSocketBLiveClientOnGuardBuy(Guard guard)
         {
-            StringBuilder sb = new StringBuilder($"用户[{guard.userInfo.userName}]充值了{(guard.guardUnit=="月"?(guard.guardNum+"个月"):guard.guardUnit.TrimStart('*'))}[{(guard.guardLevel==1?"总督":guard.guardLevel==2?"提督":"舰长")}]大航海");
+            StringBuilder sb = new StringBuilder($"用户[{guard.userInfo.userName}]充值了{(guard.guardUnit == "月" ? (guard.guardNum + "个月") : guard.guardUnit.TrimStart('*'))}[{(guard.guardLevel == 1 ? "总督" : guard.guardLevel == 2 ? "提督" : "舰长")}]大航海");
             Logger.Log(sb.ToString());
         }
 
@@ -160,6 +140,5 @@ namespace OpenBLiveSample
             StringBuilder sb = new StringBuilder($"用户[{dm.userName}]发送弹幕:{dm.msg}");
             Logger.Log(sb.ToString());
         }
-
     }
 }

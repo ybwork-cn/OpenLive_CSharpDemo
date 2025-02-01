@@ -1,11 +1,8 @@
-﻿using System;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OpenBLive.Runtime.Data;
 using OpenBLive.Runtime.Utilities;
+using System.Text;
 
 namespace OpenBLive.Runtime
 {
@@ -22,9 +19,9 @@ namespace OpenBLive.Runtime
     public delegate void ReceiveLikeEvent(Like like);
 
     public delegate void ReceiveEnterEvent(Enter enter);
-    
+
     public delegate void ReceiveLiveStartEvent(LiveStart liveStart);
-    
+
     public delegate void ReceiveLiveEndEvent(LiveEnd liveEnd);
 
     public delegate void ReceiveRawNotice(string raw, JObject jObject);
@@ -107,14 +104,9 @@ namespace OpenBLive.Runtime
             m_Timer = new Timer((e) => (
                 (BLiveClient)e)?.SendAsync(Packet.HeartBeat()), this, 0, 30 * 1000);
         }
-#if UNITY_2021_2_OR_NEWER || NET5_0_OR_GREATER
+
         protected void ProcessPacket(ReadOnlySpan<byte> bytes) =>
             ProcessPacketAsync(new Packet(bytes));
-#else
-        protected void ProcessPacket(byte[] bytes) =>
-            ProcessPacketAsync(new Packet(bytes));
-#endif
-
 
         private void ProcessPacketAsync(Packet packet)
         {
@@ -147,11 +139,7 @@ namespace OpenBLive.Runtime
                 case Operation.HeartBeatResponse:
                     Array.Reverse(packet.PacketBody);
 
-#if UNITY_2021_2_OR_NEWER || NET5_0_OR_GREATER
-                    var popularity = BitConverter.ToInt32(packet.PacketBody);
-#else
-                    var popularity = BitConverter.ToInt32(packet.PacketBody,0);
-#endif
+                    int popularity = BitConverter.ToInt32(packet.PacketBody);
 
                     UpdatePopularity?.Invoke(this, popularity);
                     break;
@@ -160,8 +148,9 @@ namespace OpenBLive.Runtime
                     {
                         ProcessNotice(Encoding.UTF8.GetString(packet.PacketBody));
                     }
-                    catch (Exception)
+                    catch (Exception e)
                     {
+                        Console.WriteLine(e.ToString());
                     }
                     break;
                 // HeartBeat packet request, only send by client
@@ -173,15 +162,14 @@ namespace OpenBLive.Runtime
             }
         }
 
-
         private void ProcessNotice(string rawMessage)
         {
-            var json = JObject.Parse(rawMessage);
+            JObject json = JObject.Parse(rawMessage);
             ReceiveNotice?.Invoke(rawMessage, json);
             var data = json["data"]?.ToString();
-            if (String.IsNullOrWhiteSpace(data))
+            if (string.IsNullOrWhiteSpace(data))
                 return;
-            Logger.Log($"收到长连发来数据：\n{json?.ToString()}");
+
             try
             {
                 switch (json["cmd"]?.ToString())
@@ -222,11 +210,14 @@ namespace OpenBLive.Runtime
                         var live_end = JsonConvert.DeserializeObject<LiveEnd>(data);
                         OnLiveEnd?.Invoke(live_end);
                         break;
+                    default:
+                        Logger.Log($"收到长连发来数据：\n{json}");
+                        break;
                 }
             }
             catch (Exception e)
             {
-                Utilities.Logger.LogError("json数据解析异常 rawMessage: " + rawMessage + e.Message);
+                Logger.LogError("json数据解析异常 rawMessage: " + rawMessage + e.Message);
             }
         }
     }

@@ -1,21 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json;
 using OpenBLive.Runtime.Data;
 using OpenBLive.Runtime.Utilities;
-using Logger = OpenBLive.Runtime.Utilities.Logger;
-#if NET5_0_OR_GREATER
-using System.Net;
-#elif UNITY_2020_3_OR_NEWER
-using UnityEngine.Networking;
-#endif
 
 namespace OpenBLive.Runtime
 {
@@ -58,7 +43,7 @@ namespace OpenBLive.Runtime
 
         private const string k_Post = "POST";
 
- 
+
 
         public static async Task<string> StartInteractivePlay(string code, string appId)
         {
@@ -108,52 +93,16 @@ namespace OpenBLive.Runtime
         private static async Task<string> RequestWebUTF8(string url, string method, string param,
             string cookie = null)
         {
-#if NET5_0_OR_GREATER
-            string result = "";
-            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-            req.Method = method;
+            HttpClient client = new HttpClient();
+            HttpRequestMessage requestMessage = new HttpRequestMessage(new HttpMethod(method), url);
 
             if (param != null)
             {
-                SignUtility.SetReqHeader(req, param, cookie);
+                SignUtility.SetReqHeader(requestMessage, param, cookie);
             }
-
-            HttpWebResponse httpResponse = (HttpWebResponse)(await req.GetResponseAsync());
-            Stream stream = httpResponse.GetResponseStream();
-
-            if (stream != null)
-            {
-                using StreamReader reader = new StreamReader(stream, Encoding.UTF8);
-                result = await reader.ReadToEndAsync();
-            }
-
+            HttpResponseMessage res = await client.SendAsync(requestMessage);
+            string result = await res.Content.ReadAsStringAsync();
             return result;
-
-#elif UNITY_2020_3_OR_NEWER
-            UnityWebRequest webRequest = new UnityWebRequest(url);
-            webRequest.method = method;
-            if (param != null)
-            {
-                SignUtility.SetReqHeader(webRequest, param, cookie);
-            }
-
-            webRequest.downloadHandler = new DownloadHandlerBuffer();
-            webRequest.disposeUploadHandlerOnDispose = true;
-            webRequest.disposeDownloadHandlerOnDispose = true;
-            await webRequest.SendWebRequest();
-            var text = webRequest.downloadHandler.text;
-
-            webRequest.Dispose();
-            return text;
-#endif
         }
-#if UNITY_2020_3_OR_NEWER
-        private static TaskAwaiter GetAwaiter(this UnityEngine.AsyncOperation asyncOp)
-        {
-            var tcs = new TaskCompletionSource<object>();
-            asyncOp.completed += _ => { tcs.SetResult(null); };
-            return ((Task) tcs.Task).GetAwaiter();
-        }
-#endif
     }
 }
